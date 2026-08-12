@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gravity Flip - The Mobile Scaling Update</title>
+    <title>Gravity Flip - Speed & Branding Fix</title>
     <style>
         body {
             margin: 0; padding: 0; background-color: #010005; 
@@ -59,12 +59,14 @@
 
         #hud { position: absolute; top: 20px; left: 20px; font-size: 28px; font-weight: 900; color: #00FFCC; text-shadow: 0 0 10px #00FFCC; pointer-events: none; z-index: 10; }
 
-        /* NEW: Developer Credit Styling */
+        /* UPDATED: Lifted higher to avoid mobile address bars and forced to center */
         .credit-text {
             position: absolute;
-            bottom: 20px;
+            bottom: 50px; 
+            width: 100%;
+            text-align: center;
             font-size: 14px;
-            color: rgba(255, 255, 255, 0.4); /* Faded white so it looks sleek */
+            color: rgba(255, 255, 255, 0.6); 
             letter-spacing: 1.5px;
             text-transform: uppercase;
             pointer-events: none;
@@ -78,7 +80,6 @@
         <h1 style="color: #00FFCC; text-shadow: 0 0 20px #00FFCC;">Gravity Flip</h1>
         <p>Hold sideways.<br>Tap to ignite your thrusters.</p>
         <button class="btn btn-play" id="start-btn">Play Now</button>
-        <!-- NEW: Credit on Start Screen -->
         <div class="credit-text">Developed by Tauhidul Islam Nahid</div>
     </div>
 
@@ -91,7 +92,6 @@
             <button class="btn btn-revive" id="retry-btn">► Retry Level</button>
             <button class="btn btn-restart" id="restart-btn">Restart from Lv 1</button>
         </div>
-        <!-- NEW: Credit on Death Screen -->
         <div class="credit-text">Developed by Tauhidul Islam Nahid</div>
     </div>
 
@@ -109,7 +109,7 @@
         const isMobile = h < 500 || w < 900; 
         const ballSize = isMobile ? 12 : 20; 
         const sawRadius = isMobile ? 16 : 28; 
-        const GRAVITY_FORCE = isMobile ? 1.2 : 1.8; 
+        const GRAVITY_FORCE = isMobile ? 1.0 : 1.8; // Lowered gravity for mobile
 
         // 2. STATE & MEMORY
         let gameState = 'START'; 
@@ -159,7 +159,8 @@
             const maxSaws = isMobile ? 5 : 10;
             const spikeCount = Math.min(levelNum, maxSaws); 
             
-            const startX = isMobile ? 150 : 250; 
+            // UPDATED: Push the first sawblade much further away on mobile for breathing room
+            const startX = isMobile ? (w * 0.4) : 250; 
             const endX = w - 100;
             const spacing = (endX - startX) / (spikeCount + 1);
 
@@ -186,7 +187,11 @@
         Events.on(engine, 'beforeUpdate', function() {
             if (gameState !== 'PLAYING') return;
 
-            const dynamicSpeed = (isMobile ? 3.5 : 4.5) + (currentLevel * 0.35); 
+            // UPDATED SPEED MATH: Massively reduced the base speed and the level increase for mobile
+            const baseSpeed = isMobile ? 2.2 : 4.5;
+            const speedMultiplier = isMobile ? 0.15 : 0.35;
+            const dynamicSpeed = baseSpeed + (currentLevel * speedMultiplier); 
+            
             Body.setVelocity(ball, { x: dynamicSpeed, y: ball.velocity.y });
             
             trailHistory.push({ x: ball.position.x, y: ball.position.y });
