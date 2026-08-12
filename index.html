@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Flip - Phase 4 (Multi-Level Progression)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            overflow: hidden;
+            touch-action: none; 
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    
+    <script>
+        // 1. SETUP
+        const Engine = Matter.Engine,
+              Render = Matter.Render,
+              Runner = Matter.Runner,
+              Bodies = Matter.Bodies,
+              Composite = Matter.Composite,
+              Events = Matter.Events,
+              Body = Matter.Body;
+
+        const engine = Engine.create();
+        const world = engine.world;
+
+        const render = Render.create({
+            element: document.body,
+            engine: engine,
+            options: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                wireframes: false, 
+                background: '#000000' 
+            }
+        });
+
+        // 2. CREATE PERMANENT OBJECTS (Floor, Ceiling, Ball)
+        const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 20, window.innerWidth, 40, { isStatic: true, render: { fillStyle: '#111111' } });
+        const ceiling = Bodies.rectangle(window.innerWidth / 2, 20, window.innerWidth, 40, { isStatic: true, render: { fillStyle: '#111111' } });
+
+        const ball = Bodies.circle(50, window.innerHeight / 2, 30, { 
+            restitution: 0.9, 
+            render: { fillStyle: '#00FFCC' },
+            label: 'ball'
+        });
+
+        Composite.add(world, [ground, ceiling, ball]);
+
+        // 3. LEVEL BLUEPRINTS
+        // This is our list of levels. You can easily add more later!
+        const levels = [
+            {
+                // Level 1: One simple floor spike
+                spikes: [ 
+                    { x: window.innerWidth / 2, y: window.innerHeight - 60, width: 40, height: 40 } 
+                ],
+                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
+            },
+            {
+                // Level 2: Floor spike AND a ceiling spike
+                spikes: [ 
+                    { x: window.innerWidth / 3, y: window.innerHeight - 60, width: 40, height: 40 },
+                    { x: (window.innerWidth / 3) * 2, y: 60, width: 40, height: 40 } // Y: 60 touches the ceiling
+                ],
+                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
+            },
+            {
+                // Level 3: A tunnel of three spikes
+                spikes: [ 
+                    { x: window.innerWidth / 3, y: 60, width: 40, height: 40 }, 
+                    { x: window.innerWidth / 2, y: window.innerHeight - 60, width: 40, height: 40 },
+                    { x: (window.innerWidth / 4) * 3, y: window.innerHeight / 2, width: 40, height: 40 } // Floating in the middle!
+                ],
+                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
+            }
+        ];
+
+        // 4. THE LEVEL LOADER
+        let currentLevel = 0; // Starts at 0 (which is Level 1 in computer math)
+        let activeSpikes = []; // Tracks spikes currently on screen
+        let activeGoal = null; // Tracks the current goal
+
+        function loadLevel(levelIndex) {
+            // Step A: Sweep away old spikes and goal
+            if (activeSpikes.length > 0) {
+                Composite.remove(world, activeSpikes);
+            }
+            if (activeGoal !== null) {
+                Composite.remove(world, activeGoal);
+            }
+            activeSpikes = [];
+
+            // Step B: Get the blueprint for the new level
+            const blueprint = levels[levelIndex];
+
+            // Step C: Build the new spikes
+            for (let i = 0; i < blueprint.spikes.length; i++) {
+                const sData = blueprint.spikes[i];
+                const newSpike = Bodies.rectangle(sData.x, sData.y, sData.width, sData.height, {
+                    isStatic: true,
+                    render: { fillStyle: '#FF0033' },
+                    label: 'spike'
+                });
+                activeSpikes.push(newSpike);
+            }
+
+            // Step D: Build the new goal
+            activeGoal = Bodies.rectangle(blueprint.goal.x, blueprint.goal.y, blueprint.goal.width, blueprint.goal.height, {
+                isStatic: true,
+                render: { fillStyle: '#B900FF' },
+                label: 'goal'
+            });
+
+            // Step E: Put them into the physical world
+            Composite.add(world, [...activeSpikes, activeGoal]);
+
+            // Step F: Reset the ball back to the start
+            Body.setPosition(ball, { x: 50, y: window.innerHeight / 2 });
+            Body.setVelocity(ball, { x: 0, y: 0 }); // Stop momentum
+            engine.gravity.y = 1; // Reset gravity down
+            trailHistory.length = 0; // Clear the neon trail
+        }
+
+        // 5. VISUALS & EFFECTS (Kept from Phase 3)
+        const trailHistory = []; 
+
+        Events.on(engine, 'beforeUpdate', function() {
+            Body.setVelocity(ball, { x: 5, y: ball.velocity.y });
+            trailHistory.push({ x: ball.position.x, y: ball.position.y });
+            if (trailHistory.length > 20) trailHistory.shift(); 
+        });
+
+        Events.on(render, 'afterRender', function() {
+            const context = render.context;
+            context.shadowBlur = 0; 
+            
+            // Trail
+            context.shadowBlur = 20;
+            context.shadowColor = '#00FFCC';
+            context.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+            context.lineWidth = 20;
+            context.lineCap = 'round';
+            context.beginPath();
+            for (let i = 0; i < trailHistory.length; i++) {
+                const point = trailHistory[i];
+                if (i === 0) context.moveTo(point.x, point.y);
+                else context.lineTo(point.x, point.y);
+            }
+            context.stroke();
+
+            // Object Glows
+            context.shadowBlur = 15;
+            const allBodies = Composite.allBodies(world);
+            for(let b of allBodies) {
+                if (b.label === 'spike') {
+                    context.fillStyle = b.render.fillStyle;
+                    context.shadowColor = '#FF0033';
+                    context.shadowBlur = 15;
+                    context.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
+                } else if (b.label === 'goal') {
+                    context.fillStyle = b.render.fillStyle;
+                    context.shadowColor = '#B900FF';
+                    context.shadowBlur = 25;
+                    context.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
+                } else if (b.label === 'ball') {
+                    context.fillStyle = b.render.fillStyle;
+                    context.shadowColor = '#00FFCC';
+                    context.shadowBlur = 20;
+                    context.beginPath();
+                    context.arc(b.position.x, b.position.y, b.circleRadius, 0, 2 * Math.PI);
+                    context.fill();
+                }
+            }
+            context.shadowBlur = 0; 
+        });
+
+        function spawnGoalExplosion(x, y) {
+            const particleCount = 30;
+            const particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                const p = Bodies.circle(x, y, 4, {
+                    render: { fillStyle: '#B900FF' },
+                    frictionAir: 0.05,
+                    label: 'particle'
+                });
+                const angle = Math.random() * Math.PI * 2;
+                const force = 0.05 * Math.random();
+                Body.applyForce(p, { x: 0, y: 0 }, { x: Math.cos(angle) * force, y: Math.sin(angle) * force });
+                particles.push(p);
+            }
+            Composite.add(world, particles);
+            setTimeout(() => { Composite.remove(world, particles); }, 2000);
+        }
+
+        // 6. COLLISION LOGIC (Now with Level Progression!)
+        Events.on(engine, 'collisionStart', function(event) {
+            const pairs = event.pairs;
+
+            for (let i = 0; i < pairs.length; i++) {
+                const bodyA = pairs[i].bodyA;
+                const bodyB = pairs[i].bodyB;
+
+                // Did you hit a spike? 
+                if ((bodyA.label === 'ball' && bodyB.label === 'spike') || (bodyB.label === 'ball' && bodyA.label === 'spike')) {
+                    // Respawn instantly at the start of the CURRENT level
+                    Body.setPosition(ball, { x: 50, y: window.innerHeight / 2 });
+                    engine.gravity.y = 1; 
+                    trailHistory.length = 0; 
+                }
+
+                // Did you hit the goal?
+                if ((bodyA.label === 'ball' && bodyB.label === 'goal') || (bodyB.label === 'ball' && bodyA.label === 'goal')) {
+                    spawnGoalExplosion(ball.position.x, ball.position.y);
+                    trailHistory.length = 0;
+                    Body.setPosition(ball, { x: -1000, y: 0 }); // Hide ball during explosion
+
+                    setTimeout(() => {
+                        currentLevel++; // Increase level number by 1
+                        
+                        // Check if we ran out of levels in our blueprint array
+                        if (currentLevel >= levels.length) {
+                            alert("GAME COMPLETE! You beat all the levels! Returning to Level 1.");
+                            currentLevel = 0; // Reset to the beginning
+                        }
+                        
+                        // Load the next level automatically!
+                        loadLevel(currentLevel);
+                    }, 1000); 
+                }
+            }
+        });
+
+        // 7. INPUT
+        function flipGravity() {
+            if (engine.gravity.y === 1) engine.gravity.y = -1;
+            else engine.gravity.y = 1;
+        }
+        window.addEventListener('mousedown', flipGravity);
+        window.addEventListener('touchstart', flipGravity);
+
+        // 8. START THE GAME (Load Level 1 to begin)
+        loadLevel(currentLevel); 
+        
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+    </script>
+</body>
+</html>
