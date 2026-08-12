@@ -2,258 +2,368 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravity Flip - Phase 4 (Multi-Level Progression)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gravity Flip - The UI Polish Update</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #000000;
-            overflow: hidden;
-            touch-action: none; 
+            margin: 0; padding: 0; background-color: #010005; 
+            overflow: hidden; touch-action: none; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white; transition: transform 0.1s; 
         }
-        canvas {
-            display: block;
+        canvas { display: block; }
+        
+        .shake { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-6px, 0, 0); }
+            20%, 80% { transform: translate3d(6px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-12px, 0, 0); }
+            40%, 60% { transform: translate3d(12px, 0, 0); }
         }
+
+        /* UI Screen Base */
+        .ui-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; backdrop-filter: blur(8px); /* Frosted glass blur */
+            background-size: 200% 200%; /* Makes the gradient big enough to slide around */
+            animation: gradientShift 6s ease infinite; /* 6-second breathing loop */
+        }
+
+        /* NEW: Start Screen Cyan Pulse */
+        #start-screen {
+            background: linear-gradient(45deg, rgba(1,0,5,0.9), rgba(0,255,204,0.15), rgba(1,0,5,0.9));
+        }
+
+        /* NEW: Game Over Red Alarm Pulse */
+        #game-over-screen {
+            background: linear-gradient(45deg, rgba(1,0,5,0.95), rgba(255,51,0,0.25), rgba(1,0,5,0.95));
+        }
+
+        /* This animation slides the background colors back and forth */
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .hidden { display: none !important; }
+        
+        h1 { font-size: 48px; color: #FF3300; text-shadow: 0 0 20px #FF3300; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 4px; text-align: center;}
+        p { font-size: 20px; color: #aaa; margin-bottom: 30px; text-align: center;}
+        .score-text { font-size: 24px; color: #fff; margin: 5px 0; }
+        
+        .btn-container { display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; justify-content: center;}
+
+        .btn {
+            padding: 15px 30px; font-size: 20px; font-weight: bold; color: #050505;
+            border: none; border-radius: 5px; cursor: pointer; text-transform: uppercase;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-play { background-color: #00FFCC; box-shadow: 0 0 15px #00FFCC; }
+        .btn-restart { background-color: #FF3300; box-shadow: 0 0 15px #FF3300; color: white; }
+        .btn-revive { background-color: #FFCC00; box-shadow: 0 0 15px #FFCC00; } 
+
+        #hud { position: absolute; top: 20px; left: 20px; font-size: 28px; font-weight: 900; color: #00FFCC; text-shadow: 0 0 10px #00FFCC; pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body>
+    <div id="hud" class="hidden">LEVEL <span id="hud-level">1</span></div>
+
+    <div id="start-screen" class="ui-screen">
+        <h1 style="color: #00FFCC; text-shadow: 0 0 20px #00FFCC;">Gravity Flip</h1>
+        <p>Hold sideways.<br>Tap to ignite your thrusters.</p>
+        <button class="btn btn-play" id="start-btn">Play Now</button>
+    </div>
+
+    <div id="game-over-screen" class="ui-screen hidden">
+        <h1>HULL BREACH</h1>
+        <div class="score-text">Failed at Level: <span id="final-level">1</span></div>
+        <div class="score-text" style="color: #00FFCC; margin-bottom: 20px;">Best Level: <span id="best-level">1</span></div>
+        
+        <div class="btn-container">
+            <button class="btn btn-revive" id="retry-btn">► Retry Level</button>
+            <button class="btn btn-restart" id="restart-btn">Restart from Lv 1</button>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     
     <script>
         // 1. SETUP
-        const Engine = Matter.Engine,
-              Render = Matter.Render,
-              Runner = Matter.Runner,
-              Bodies = Matter.Bodies,
-              Composite = Matter.Composite,
-              Events = Matter.Events,
-              Body = Matter.Body;
+        const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
+              Bodies = Matter.Bodies, Composite = Matter.Composite, Events = Matter.Events, Body = Matter.Body;
 
         const engine = Engine.create();
         const world = engine.world;
+        let w = window.innerWidth, h = window.innerHeight;
+        
+        const GRAVITY_FORCE = 1.8; 
 
-        const render = Render.create({
-            element: document.body,
-            engine: engine,
-            options: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                wireframes: false, 
-                background: '#000000' 
-            }
-        });
+        // 2. STATE & MEMORY
+        let gameState = 'START'; 
+        let currentLevel = 1;
+        let bestLevel = localStorage.getItem('gravityFlipBest') || 1; 
+        
+        let ball, ground, ceiling, leftWall, activeSpikes = [], activeGoal = null;
+        let trailHistory = []; 
+        let stars = [];
+        let planets = [];
+        const ballSize = w < 600 ? 15 : 20;
 
-        // 2. CREATE PERMANENT OBJECTS (Floor, Ceiling, Ball)
-        const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 20, window.innerWidth, 40, { isStatic: true, render: { fillStyle: '#111111' } });
-        const ceiling = Bodies.rectangle(window.innerWidth / 2, 20, window.innerWidth, 40, { isStatic: true, render: { fillStyle: '#111111' } });
-
-        const ball = Bodies.circle(50, window.innerHeight / 2, 30, { 
-            restitution: 0.9, 
-            render: { fillStyle: '#00FFCC' },
-            label: 'ball'
-        });
-
-        Composite.add(world, [ground, ceiling, ball]);
-
-        // 3. LEVEL BLUEPRINTS
-        // This is our list of levels. You can easily add more later!
-        const levels = [
-            {
-                // Level 1: One simple floor spike
-                spikes: [ 
-                    { x: window.innerWidth / 2, y: window.innerHeight - 60, width: 40, height: 40 } 
-                ],
-                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
-            },
-            {
-                // Level 2: Floor spike AND a ceiling spike
-                spikes: [ 
-                    { x: window.innerWidth / 3, y: window.innerHeight - 60, width: 40, height: 40 },
-                    { x: (window.innerWidth / 3) * 2, y: 60, width: 40, height: 40 } // Y: 60 touches the ceiling
-                ],
-                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
-            },
-            {
-                // Level 3: A tunnel of three spikes
-                spikes: [ 
-                    { x: window.innerWidth / 3, y: 60, width: 40, height: 40 }, 
-                    { x: window.innerWidth / 2, y: window.innerHeight - 60, width: 40, height: 40 },
-                    { x: (window.innerWidth / 4) * 3, y: window.innerHeight / 2, width: 40, height: 40 } // Floating in the middle!
-                ],
-                goal: { x: window.innerWidth - 30, y: window.innerHeight / 2, width: 60, height: 200 }
-            }
-        ];
-
-        // 4. THE LEVEL LOADER
-        let currentLevel = 0; // Starts at 0 (which is Level 1 in computer math)
-        let activeSpikes = []; // Tracks spikes currently on screen
-        let activeGoal = null; // Tracks the current goal
-
-        function loadLevel(levelIndex) {
-            // Step A: Sweep away old spikes and goal
-            if (activeSpikes.length > 0) {
-                Composite.remove(world, activeSpikes);
-            }
-            if (activeGoal !== null) {
-                Composite.remove(world, activeGoal);
-            }
-            activeSpikes = [];
-
-            // Step B: Get the blueprint for the new level
-            const blueprint = levels[levelIndex];
-
-            // Step C: Build the new spikes
-            for (let i = 0; i < blueprint.spikes.length; i++) {
-                const sData = blueprint.spikes[i];
-                const newSpike = Bodies.rectangle(sData.x, sData.y, sData.width, sData.height, {
-                    isStatic: true,
-                    render: { fillStyle: '#FF0033' },
-                    label: 'spike'
-                });
-                activeSpikes.push(newSpike);
-            }
-
-            // Step D: Build the new goal
-            activeGoal = Bodies.rectangle(blueprint.goal.x, blueprint.goal.y, blueprint.goal.width, blueprint.goal.height, {
-                isStatic: true,
-                render: { fillStyle: '#B900FF' },
-                label: 'goal'
+        for(let i=0; i<150; i++) stars.push({ x: Math.random() * w, y: Math.random() * h, speed: Math.random() * 1.5 + 0.2, size: Math.random() * 2 });
+        for(let i=0; i<3; i++) {
+            planets.push({
+                x: Math.random() * w, y: Math.random() * h,
+                size: Math.random() * 40 + 20, speed: Math.random() * 0.3 + 0.1,
+                colorR: Math.floor(Math.random() * 100), colorG: Math.floor(Math.random() * 50), colorB: Math.floor(Math.random() * 150 + 100)
             });
-
-            // Step E: Put them into the physical world
-            Composite.add(world, [...activeSpikes, activeGoal]);
-
-            // Step F: Reset the ball back to the start
-            Body.setPosition(ball, { x: 50, y: window.innerHeight / 2 });
-            Body.setVelocity(ball, { x: 0, y: 0 }); // Stop momentum
-            engine.gravity.y = 1; // Reset gravity down
-            trailHistory.length = 0; // Clear the neon trail
         }
 
-        // 5. VISUALS & EFFECTS (Kept from Phase 3)
-        const trailHistory = []; 
+        const render = Render.create({
+            element: document.body, engine: engine,
+            options: { width: w, height: h, wireframes: false, background: '#000000' }
+        });
 
+        // 3. BUILD WORLD
+        function initWorld() {
+            Composite.clear(world); Engine.clear(engine);
+
+            const wallOptions = { isStatic: true, render: { fillStyle: 'rgba(0,0,0,0)' }, label: 'wall' }; 
+            ground = Bodies.rectangle(w / 2, h + 20, w, 80, wallOptions); 
+            ceiling = Bodies.rectangle(w / 2, -20, w, 80, wallOptions);   
+            leftWall = Bodies.rectangle(-20, h / 2, 80, h, wallOptions);  
+            
+            ball = Bodies.circle(50, h / 2, ballSize, { 
+                restitution: 0.7, label: 'ball', isStatic: true 
+            });
+
+            Composite.add(world, [ground, ceiling, leftWall, ball]);
+        }
+
+        function buildLevel(levelNum) {
+            if (activeSpikes.length > 0) Composite.remove(world, activeSpikes);
+            if (activeGoal) Composite.remove(world, activeGoal);
+            activeSpikes = []; trailHistory = [];
+
+            const spikeCount = Math.min(levelNum + 2, 10); 
+            const startX = 250, endX = w - 100;
+            const spacing = (endX - startX) / (spikeCount + 1);
+
+            for (let i = 1; i <= spikeCount; i++) {
+                const xPos = startX + (spacing * i);
+                const placement = Math.floor(Math.random() * 3);
+                let yPos = h - 30; if (placement === 1) yPos = 30; if (placement === 2) yPos = h / 2; 
+
+                const saw = Bodies.circle(xPos, yPos, 28, { isStatic: true, label: 'saw', isMoving: placement === 2 });
+                activeSpikes.push(saw);
+            }
+
+            activeGoal = Bodies.rectangle(w - 20, h / 2, 40, h, { isStatic: true, isSensor: true, label: 'goal' });
+            Composite.add(world, [...activeSpikes, activeGoal]);
+            
+            document.getElementById('hud-level').innerText = levelNum;
+            
+            Body.setPosition(ball, { x: 50, y: h / 2 });
+            Body.setVelocity(ball, { x: 0, y: 0 }); 
+            engine.gravity.y = GRAVITY_FORCE; 
+        }
+
+        // 4. LOGIC & GRAPHICS
         Events.on(engine, 'beforeUpdate', function() {
-            Body.setVelocity(ball, { x: 5, y: ball.velocity.y });
+            if (gameState !== 'PLAYING') return;
+
+            const dynamicSpeed = 4.5 + (currentLevel * 0.35); 
+            Body.setVelocity(ball, { x: dynamicSpeed, y: ball.velocity.y });
+            
             trailHistory.push({ x: ball.position.x, y: ball.position.y });
-            if (trailHistory.length > 20) trailHistory.shift(); 
+            if (trailHistory.length > 30) trailHistory.shift(); 
+
+            const time = engine.timing.timestamp * 0.002;
+            for (let i = 0; i < activeSpikes.length; i++) {
+                const saw = activeSpikes[i];
+                if (saw.isMoving) Body.setPosition(saw, { x: saw.position.x, y: (h / 2) + Math.sin(time + i*2) * (h / 3) });
+            }
         });
 
         Events.on(render, 'afterRender', function() {
-            const context = render.context;
-            context.shadowBlur = 0; 
+            const ctx = render.context;
+            const time = engine.timing.timestamp * 0.005;
             
-            // Trail
-            context.shadowBlur = 20;
-            context.shadowColor = '#00FFCC';
-            context.strokeStyle = 'rgba(0, 255, 204, 0.3)';
-            context.lineWidth = 20;
-            context.lineCap = 'round';
-            context.beginPath();
-            for (let i = 0; i < trailHistory.length; i++) {
-                const point = trailHistory[i];
-                if (i === 0) context.moveTo(point.x, point.y);
-                else context.lineTo(point.x, point.y);
-            }
-            context.stroke();
+            let spaceGradient = ctx.createLinearGradient(0, 0, 0, h);
+            spaceGradient.addColorStop(0, '#010008'); 
+            spaceGradient.addColorStop(0.5, '#0a0524'); 
+            spaceGradient.addColorStop(1, '#020012'); 
+            ctx.fillStyle = spaceGradient;
+            ctx.fillRect(0, 0, w, h);
 
-            // Object Glows
-            context.shadowBlur = 15;
+            for(let i=0; i<planets.length; i++) {
+                let p = planets[i];
+                if(gameState === 'PLAYING') p.x -= p.speed; 
+                if(p.x < -p.size) p.x = w + p.size; 
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                let planetGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+                planetGlow.addColorStop(0, `rgba(${p.colorR}, ${p.colorG}, ${p.colorB}, 0.8)`);
+                planetGlow.addColorStop(1, `rgba(${p.colorR}, ${p.colorG}, ${p.colorB}, 0)`);
+                ctx.fillStyle = planetGlow;
+                ctx.fill();
+            }
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            for(let i=0; i<stars.length; i++) {
+                let s = stars[i];
+                if(gameState === 'PLAYING') s.x -= s.speed; 
+                if(s.x < 0) s.x = w; 
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill();
+            }
+
+            if(gameState !== 'PLAYING') return; 
+
+            ctx.shadowBlur = 0;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < trailHistory.length - 1; i++) {
+                let p1 = trailHistory[i]; let p2 = trailHistory[i+1];
+                let ratio = i / trailHistory.length; 
+                
+                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+                
+                if (ratio > 0.8) ctx.strokeStyle = `rgba(255, 255, 255, ${ratio})`;
+                else if (ratio > 0.6) ctx.strokeStyle = `rgba(255, 220, 0, ${ratio})`;
+                else if (ratio > 0.3) ctx.strokeStyle = `rgba(255, 100, 0, ${ratio})`;
+                else ctx.strokeStyle = `rgba(200, 20, 0, ${ratio * 0.5})`; 
+                
+                ctx.lineWidth = ballSize * 1.5 * ratio;
+                ctx.stroke();
+            }
+
             const allBodies = Composite.allBodies(world);
             for(let b of allBodies) {
-                if (b.label === 'spike') {
-                    context.fillStyle = b.render.fillStyle;
-                    context.shadowColor = '#FF0033';
-                    context.shadowBlur = 15;
-                    context.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
-                } else if (b.label === 'goal') {
-                    context.fillStyle = b.render.fillStyle;
-                    context.shadowColor = '#B900FF';
-                    context.shadowBlur = 25;
-                    context.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
-                } else if (b.label === 'ball') {
-                    context.fillStyle = b.render.fillStyle;
-                    context.shadowColor = '#00FFCC';
-                    context.shadowBlur = 20;
-                    context.beginPath();
-                    context.arc(b.position.x, b.position.y, b.circleRadius, 0, 2 * Math.PI);
-                    context.fill();
+                if (b.label === 'saw') {
+                    ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(-time * 2); 
+                    
+                    let gradient = ctx.createRadialGradient(0, 0, 5, 0, 0, 28);
+                    gradient.addColorStop(0, '#111'); gradient.addColorStop(0.7, '#444'); gradient.addColorStop(1, '#888');
+                    ctx.fillStyle = gradient;
+                    
+                    ctx.strokeStyle = '#111'; ctx.lineWidth = 1; 
+                    ctx.shadowColor = '#FF0000'; ctx.shadowBlur = 25; 
+                    
+                    ctx.beginPath();
+                    const teeth = 10;
+                    for(let j=0; j<teeth; j++) { 
+                        ctx.lineTo(18, -4); ctx.lineTo(35, 12); ctx.lineTo(18, 4);  
+                        ctx.rotate((Math.PI * 2) / teeth); 
+                    }
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    
+                    ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                } 
+                else if (b.label === 'goal') {
+                    ctx.save(); ctx.shadowColor = '#00FFCC'; ctx.shadowBlur = 30; ctx.strokeStyle = '#00FFCC'; ctx.lineWidth = 4;
+                    const waveY = Math.sin(time) * (h / 2 - 20);
+                    ctx.fillStyle = 'rgba(0, 255, 204, 0.1)'; ctx.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
+                    ctx.beginPath(); ctx.ellipse(b.position.x, b.position.y + waveY, 25, 10, 0, 0, Math.PI * 2); ctx.stroke();
+                    ctx.beginPath(); ctx.ellipse(b.position.x, b.position.y - waveY, 25, 10, 0, 0, Math.PI * 2); ctx.stroke();
+                    ctx.restore();
+                } 
+                else if (b.label === 'ball') {
+                    ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = '#FFCC00'; ctx.shadowBlur = 25;
+                    ctx.beginPath(); ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI*2); ctx.fill();
                 }
             }
-            context.shadowBlur = 0; 
+            ctx.shadowBlur = 0; 
         });
 
-        function spawnGoalExplosion(x, y) {
-            const particleCount = 30;
+        // 5. GAME OVER LOGIC
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            Body.setStatic(ball, true); 
+            trailHistory = [];
+            
+            document.body.classList.add('shake');
+            setTimeout(() => document.body.classList.remove('shake'), 400);
+
+            if (currentLevel > bestLevel) { bestLevel = currentLevel; localStorage.setItem('gravityFlipBest', bestLevel); }
+
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('final-level').innerText = currentLevel;
+            document.getElementById('best-level').innerText = bestLevel;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function spawnExplosion(x, y, color) {
             const particles = [];
-            for (let i = 0; i < particleCount; i++) {
-                const p = Bodies.circle(x, y, 4, {
-                    render: { fillStyle: '#B900FF' },
-                    frictionAir: 0.05,
-                    label: 'particle'
-                });
-                const angle = Math.random() * Math.PI * 2;
-                const force = 0.05 * Math.random();
+            for (let i = 0; i < 50; i++) { 
+                const p = Bodies.circle(x, y, Math.random() * 5 + 2, { render: { fillStyle: color }, frictionAir: 0.03, label: 'particle' });
+                const angle = Math.random() * Math.PI * 2, force = 0.1 * Math.random();
                 Body.applyForce(p, { x: 0, y: 0 }, { x: Math.cos(angle) * force, y: Math.sin(angle) * force });
                 particles.push(p);
             }
             Composite.add(world, particles);
-            setTimeout(() => { Composite.remove(world, particles); }, 2000);
+            setTimeout(() => { Composite.remove(world, particles); }, 1500);
         }
 
-        // 6. COLLISION LOGIC (Now with Level Progression!)
         Events.on(engine, 'collisionStart', function(event) {
+            if (gameState !== 'PLAYING') return;
             const pairs = event.pairs;
-
             for (let i = 0; i < pairs.length; i++) {
-                const bodyA = pairs[i].bodyA;
-                const bodyB = pairs[i].bodyB;
-
-                // Did you hit a spike? 
-                if ((bodyA.label === 'ball' && bodyB.label === 'spike') || (bodyB.label === 'ball' && bodyA.label === 'spike')) {
-                    // Respawn instantly at the start of the CURRENT level
-                    Body.setPosition(ball, { x: 50, y: window.innerHeight / 2 });
-                    engine.gravity.y = 1; 
-                    trailHistory.length = 0; 
+                const a = pairs[i].bodyA.label, b = pairs[i].bodyB.label;
+                
+                if ((a === 'ball' && b === 'saw') || (b === 'ball' && a === 'saw')) {
+                    spawnExplosion(ball.position.x, ball.position.y, '#FF3300'); 
+                    triggerGameOver();
                 }
-
-                // Did you hit the goal?
-                if ((bodyA.label === 'ball' && bodyB.label === 'goal') || (bodyB.label === 'ball' && bodyA.label === 'goal')) {
-                    spawnGoalExplosion(ball.position.x, ball.position.y);
-                    trailHistory.length = 0;
-                    Body.setPosition(ball, { x: -1000, y: 0 }); // Hide ball during explosion
-
+                
+                if ((a === 'ball' && b === 'goal') || (b === 'ball' && a === 'goal')) {
+                    spawnExplosion(ball.position.x, ball.position.y, '#00FFCC');
+                    trailHistory = [];
+                    Body.setPosition(ball, { x: -1000, y: 0 }); 
+                    
+                    gameState = 'LOADING'; 
                     setTimeout(() => {
-                        currentLevel++; // Increase level number by 1
-                        
-                        // Check if we ran out of levels in our blueprint array
-                        if (currentLevel >= levels.length) {
-                            alert("GAME COMPLETE! You beat all the levels! Returning to Level 1.");
-                            currentLevel = 0; // Reset to the beginning
-                        }
-                        
-                        // Load the next level automatically!
-                        loadLevel(currentLevel);
+                        currentLevel++;
+                        buildLevel(currentLevel);
+                        gameState = 'PLAYING';
                     }, 1000); 
                 }
             }
         });
 
-        // 7. INPUT
-        function flipGravity() {
-            if (engine.gravity.y === 1) engine.gravity.y = -1;
-            else engine.gravity.y = 1;
-        }
-        window.addEventListener('mousedown', flipGravity);
-        window.addEventListener('touchstart', flipGravity);
+        // 6. CONTROLS & BUTTONS
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('start-screen').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden');
+            currentLevel = 1; buildLevel(currentLevel); Body.setStatic(ball, false); gameState = 'PLAYING';
+        });
 
-        // 8. START THE GAME (Load Level 1 to begin)
-        loadLevel(currentLevel); 
-        
-        Render.run(render);
-        const runner = Runner.create();
-        Runner.run(runner, engine);
+        document.getElementById('retry-btn').addEventListener('click', () => {
+            document.getElementById('game-over-screen').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden');
+            buildLevel(currentLevel); 
+            Body.setStatic(ball, false); gameState = 'PLAYING';
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('game-over-screen').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden');
+            currentLevel = 1; 
+            buildLevel(currentLevel); 
+            Body.setStatic(ball, false); gameState = 'PLAYING';
+        });
+
+        function flipGravity() {
+            if (gameState === 'PLAYING') {
+                engine.gravity.y = engine.gravity.y === GRAVITY_FORCE ? -GRAVITY_FORCE : GRAVITY_FORCE;
+                document.body.style.transform = `translate3d(0, ${engine.gravity.y * 2}px, 0)`;
+                setTimeout(() => document.body.style.transform = 'translate3d(0,0,0)', 50);
+            }
+        }
+        window.addEventListener('mousedown', (e) => { if (e.target.tagName !== 'BUTTON') flipGravity(); });
+        window.addEventListener('touchstart', (e) => { if (e.target.tagName !== 'BUTTON') flipGravity(); });
+
+        initWorld(); Render.run(render); const runner = Runner.create(); Runner.run(runner, engine);
     </script>
 </body>
 </html>
