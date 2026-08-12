@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gravity Flip - The UI Polish Update</title>
+    <title>Gravity Flip - The Mobile Scaling Update</title>
     <style>
         body {
             margin: 0; padding: 0; background-color: #010005; 
@@ -21,26 +21,17 @@
             40%, 60% { transform: translate3d(12px, 0, 0); }
         }
 
-        /* UI Screen Base */
         .ui-screen {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 100; backdrop-filter: blur(8px); /* Frosted glass blur */
-            background-size: 200% 200%; /* Makes the gradient big enough to slide around */
-            animation: gradientShift 6s ease infinite; /* 6-second breathing loop */
+            z-index: 100; backdrop-filter: blur(8px); 
+            background-size: 200% 200%; 
+            animation: gradientShift 6s ease infinite; 
         }
 
-        /* NEW: Start Screen Cyan Pulse */
-        #start-screen {
-            background: linear-gradient(45deg, rgba(1,0,5,0.9), rgba(0,255,204,0.15), rgba(1,0,5,0.9));
-        }
+        #start-screen { background: linear-gradient(45deg, rgba(1,0,5,0.9), rgba(0,255,204,0.15), rgba(1,0,5,0.9)); }
+        #game-over-screen { background: linear-gradient(45deg, rgba(1,0,5,0.95), rgba(255,51,0,0.25), rgba(1,0,5,0.95)); }
 
-        /* NEW: Game Over Red Alarm Pulse */
-        #game-over-screen {
-            background: linear-gradient(45deg, rgba(1,0,5,0.95), rgba(255,51,0,0.25), rgba(1,0,5,0.95));
-        }
-
-        /* This animation slides the background colors back and forth */
         @keyframes gradientShift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -100,7 +91,12 @@
         const world = engine.world;
         let w = window.innerWidth, h = window.innerHeight;
         
-        const GRAVITY_FORCE = 1.8; 
+        // --- NEW MOBILE SIZING LOGIC ---
+        // We detect mobile if the screen height is narrow (landscape phone) or overall width is small.
+        const isMobile = h < 500 || w < 900; 
+        const ballSize = isMobile ? 12 : 20; 
+        const sawRadius = isMobile ? 16 : 28; 
+        const GRAVITY_FORCE = isMobile ? 1.2 : 1.8; // Softer gravity for smaller screens
 
         // 2. STATE & MEMORY
         let gameState = 'START'; 
@@ -111,7 +107,6 @@
         let trailHistory = []; 
         let stars = [];
         let planets = [];
-        const ballSize = w < 600 ? 15 : 20;
 
         for(let i=0; i<150; i++) stars.push({ x: Math.random() * w, y: Math.random() * h, speed: Math.random() * 1.5 + 0.2, size: Math.random() * 2 });
         for(let i=0; i<3; i++) {
@@ -148,8 +143,13 @@
             if (activeGoal) Composite.remove(world, activeGoal);
             activeSpikes = []; trailHistory = [];
 
-            const spikeCount = Math.min(levelNum + 2, 10); 
-            const startX = 250, endX = w - 100;
+            // --- NEW DIFFICULTY CURVE ---
+            // Starts at exactly 1 saw for Level 1, caps at 5 for mobile to prevent overcrowding.
+            const maxSaws = isMobile ? 5 : 10;
+            const spikeCount = Math.min(levelNum, maxSaws); 
+            
+            const startX = isMobile ? 150 : 250; // Give mobile players more starting runway
+            const endX = w - 100;
             const spacing = (endX - startX) / (spikeCount + 1);
 
             for (let i = 1; i <= spikeCount; i++) {
@@ -157,7 +157,8 @@
                 const placement = Math.floor(Math.random() * 3);
                 let yPos = h - 30; if (placement === 1) yPos = 30; if (placement === 2) yPos = h / 2; 
 
-                const saw = Bodies.circle(xPos, yPos, 28, { isStatic: true, label: 'saw', isMoving: placement === 2 });
+                // Use the dynamically scaled sawRadius
+                const saw = Bodies.circle(xPos, yPos, sawRadius, { isStatic: true, label: 'saw', isMoving: placement === 2 });
                 activeSpikes.push(saw);
             }
 
@@ -175,7 +176,7 @@
         Events.on(engine, 'beforeUpdate', function() {
             if (gameState !== 'PLAYING') return;
 
-            const dynamicSpeed = 4.5 + (currentLevel * 0.35); 
+            const dynamicSpeed = (isMobile ? 3.5 : 4.5) + (currentLevel * 0.35); 
             Body.setVelocity(ball, { x: dynamicSpeed, y: ball.velocity.y });
             
             trailHistory.push({ x: ball.position.x, y: ball.position.y });
@@ -243,28 +244,33 @@
             const allBodies = Composite.allBodies(world);
             for(let b of allBodies) {
                 if (b.label === 'saw') {
+                    const r = b.circleRadius; // Dynamically grab the radius to scale graphics
+                    
                     ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(-time * 2); 
                     
-                    let gradient = ctx.createRadialGradient(0, 0, 5, 0, 0, 28);
+                    let gradient = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
                     gradient.addColorStop(0, '#111'); gradient.addColorStop(0.7, '#444'); gradient.addColorStop(1, '#888');
                     ctx.fillStyle = gradient;
                     
                     ctx.strokeStyle = '#111'; ctx.lineWidth = 1; 
-                    ctx.shadowColor = '#FF0000'; ctx.shadowBlur = 25; 
+                    ctx.shadowColor = '#FF0000'; ctx.shadowBlur = isMobile ? 15 : 25; // Less blur on mobile for perf
                     
+                    // --- RELATIVE TEETH RENDERING ---
                     ctx.beginPath();
                     const teeth = 10;
                     for(let j=0; j<teeth; j++) { 
-                        ctx.lineTo(18, -4); ctx.lineTo(35, 12); ctx.lineTo(18, 4);  
+                        ctx.lineTo(r * 0.65, -r * 0.15); 
+                        ctx.lineTo(r * 1.25, r * 0.45); 
+                        ctx.lineTo(r * 0.65, r * 0.15);  
                         ctx.rotate((Math.PI * 2) / teeth); 
                     }
                     ctx.closePath(); ctx.fill(); ctx.stroke();
                     
-                    ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, Math.PI*2); ctx.fill();
                     ctx.restore();
                 } 
                 else if (b.label === 'goal') {
-                    ctx.save(); ctx.shadowColor = '#00FFCC'; ctx.shadowBlur = 30; ctx.strokeStyle = '#00FFCC'; ctx.lineWidth = 4;
+                    ctx.save(); ctx.shadowColor = '#00FFCC'; ctx.shadowBlur = isMobile ? 20 : 30; ctx.strokeStyle = '#00FFCC'; ctx.lineWidth = 4;
                     const waveY = Math.sin(time) * (h / 2 - 20);
                     ctx.fillStyle = 'rgba(0, 255, 204, 0.1)'; ctx.fillRect(b.bounds.min.x, b.bounds.min.y, b.bounds.max.x-b.bounds.min.x, b.bounds.max.y-b.bounds.min.y);
                     ctx.beginPath(); ctx.ellipse(b.position.x, b.position.y + waveY, 25, 10, 0, 0, Math.PI * 2); ctx.stroke();
@@ -272,7 +278,7 @@
                     ctx.restore();
                 } 
                 else if (b.label === 'ball') {
-                    ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = '#FFCC00'; ctx.shadowBlur = 25;
+                    ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = '#FFCC00'; ctx.shadowBlur = isMobile ? 15 : 25;
                     ctx.beginPath(); ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI*2); ctx.fill();
                 }
             }
