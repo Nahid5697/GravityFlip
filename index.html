@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Deep Space Survivor - Combat Update</title>
+    <title>Deep Space Survivor - The Ultimate Sound Update</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%; 
@@ -29,19 +29,18 @@
             40%, 60% { transform: translate3d(10px, 0, 0); }
         }
 
-        /* FIXED HUD Z-INDEX: Now forced to 1000 so it sits on top of the visor glass */
         #hud, #weapon-status, #score-status { z-index: 1000 !important; }
 
         .ui-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 2000; background: rgba(1, 2, 8, 0.6); backdrop-filter: blur(8px);
+            z-index: 2000; background: rgba(1, 2, 8, 0.8); backdrop-filter: blur(8px);
         }
 
         .hidden { display: none !important; }
         
         h1 { 
-            font-size: 50px; color: #00FFCC; margin: 0 0 10px 0; 
+            font-size: 40px; color: #00FFCC; margin: 0 0 10px 0; 
             text-transform: uppercase; letter-spacing: 5px; text-align: center; 
             text-shadow: 0 0 20px rgba(0, 255, 204, 0.8), 0 0 40px rgba(0, 255, 204, 0.4);
             border-bottom: 2px solid rgba(0, 255, 204, 0.3); padding-bottom: 10px;
@@ -64,7 +63,6 @@
             letter-spacing: 2px; transition: all 0.2s ease;
             box-shadow: 0 0 10px rgba(0, 255, 204, 0.2) inset, 0 0 15px rgba(0,0,0,0.5);
         }
-        .btn:hover { background: rgba(0, 255, 204, 0.1); box-shadow: 0 0 20px rgba(0, 255, 204, 0.5) inset; }
         .btn:active { transform: scale(0.95); }
         
         .btn-play { color: #000; background: #00FFCC; border-color: #00FFCC; box-shadow: 0 0 20px rgba(0, 255, 204, 0.6); }
@@ -72,27 +70,27 @@
         .btn-revive { color: #FFCC00; border-color: #FFCC00; box-shadow: 0 0 10px rgba(255, 204, 0, 0.2) inset; } 
 
         #hud { 
-            position: absolute; top: 20px; left: 30px; right: 30px;
+            position: absolute; top: 15px; left: 20px; right: 20px;
             display: flex; justify-content: space-between;
-            font-size: 22px; font-weight: bold; pointer-events: none; letter-spacing: 2px;
+            font-size: 18px; font-weight: bold; pointer-events: none; z-index: 1000; letter-spacing: 2px;
         }
         #timer-display { color: #FFCC00; text-shadow: 0 0 10px #FFCC00; }
         #level-display { color: #00FFCC; text-shadow: 0 0 10px #00FFCC; }
         
         #weapon-status {
-            position: absolute; bottom: 30px; left: 30px;
-            font-size: 16px; font-weight: bold; color: #00FFCC; text-transform: uppercase;
-            pointer-events: none; text-shadow: 0 0 10px #00FFCC; letter-spacing: 2px;
+            position: absolute; bottom: 20px; left: 20px;
+            font-size: 14px; font-weight: bold; color: #00FFCC; text-transform: uppercase;
+            z-index: 1000; pointer-events: none; text-shadow: 0 0 10px #00FFCC; letter-spacing: 2px;
         }
         #score-status {
-            position: absolute; bottom: 30px; right: 30px;
-            font-size: 18px; font-weight: bold; color: #FFF; text-transform: uppercase;
-            pointer-events: none; text-shadow: 0 0 10px #FFF; letter-spacing: 2px;
+            position: absolute; bottom: 20px; right: 20px;
+            font-size: 16px; font-weight: bold; color: #FFF; text-transform: uppercase;
+            z-index: 1000; pointer-events: none; text-shadow: 0 0 10px #FFF; letter-spacing: 2px;
         }
 
         .credit-text {
-            position: absolute; bottom: 15px; width: 100%; text-align: center;
-            font-size: 11px; color: rgba(255, 255, 255, 0.3); letter-spacing: 3px;
+            position: absolute; bottom: 10px; width: 100%; text-align: center;
+            font-size: 10px; color: rgba(255, 255, 255, 0.3); letter-spacing: 3px;
             text-transform: uppercase; pointer-events: none;
         }
 
@@ -127,7 +125,7 @@
     <div id="game-over-screen" class="ui-screen hidden">
         <h1 class="danger-text">HULL DESTROYED</h1>
         <div class="score-text">Final Score: <span id="final-score">0</span></div>
-        <div class="score-text" style="color: #444; font-size: 16px;">Failed at Sector: <span id="final-level">1</span></div>
+        <div class="score-text" style="color: #666; font-size: 14px;">Failed at Sector: <span id="final-level">1</span></div>
         <div class="btn-container">
             <button class="btn btn-revive" id="retry-btn">► Retry Sector</button>
             <button class="btn btn-restart" id="restart-btn">Abort Mission</button>
@@ -144,6 +142,119 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     
     <script>
+        // --- 1. ENHANCED WEB AUDIO API SYNTH ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        let engineOsc = null, engineGain = null;
+
+        const sfx = {
+            playTone: (freq, type, duration, vol=0.1, slideFreq=null) => {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                if (slideFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideFreq), audioCtx.currentTime + duration);
+                
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
+            },
+            noise: (duration, vol, cutoff=1000) => {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                const bufferSize = audioCtx.sampleRate * duration;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                
+                const noiseSource = audioCtx.createBufferSource();
+                noiseSource.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(cutoff, audioCtx.currentTime);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                
+                noiseSource.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+                noiseSource.start();
+            },
+            // PLAYER LASER: Crisp high-tech sweep
+            shoot: () => sfx.playTone(800, 'square', 0.12, 0.06, 200),
+            
+            // ENEMY LASER: Dark alien pitch-drop
+            enemyShoot: () => sfx.playTone(900, 'sawtooth', 0.25, 0.07, 120),
+            
+            // IMPACT CHIP: Short metallic hit click when hitting tough targets
+            hit: () => { sfx.playTone(400, 'triangle', 0.05, 0.08, 100); sfx.noise(0.04, 0.1, 3000); },
+            
+            // NORMAL ASTEROID DESTROYED: Crunchy rock burst
+            rockExplode: () => { sfx.noise(0.3, 0.35, 800); sfx.playTone(180, 'sawtooth', 0.25, 0.15, 30); },
+            
+            // ENEMY SHIP DESTROYED: Electric synth pop explosion
+            enemyExplode: () => { 
+                sfx.noise(0.4, 0.4, 1500); 
+                sfx.playTone(350, 'sawtooth', 0.35, 0.2, 40); 
+                sfx.playTone(700, 'square', 0.15, 0.1, 100);
+            },
+            
+            // GOLIATH SPLIT: Deep rumbling lava explosion + multi-tone crackle
+            goliathSplit: () => {
+                sfx.noise(0.8, 0.6, 500); // Deep heavy rumble
+                sfx.playTone(120, 'sawtooth', 0.7, 0.4, 15); // Sub bass drop
+                setTimeout(() => sfx.playTone(500, 'square', 0.1, 0.15, 100), 50); // Crackle 1
+                setTimeout(() => sfx.playTone(400, 'square', 0.12, 0.15, 80), 120); // Crackle 2
+                setTimeout(() => sfx.playTone(600, 'sawtooth', 0.15, 0.15, 150), 200); // Crackle 3
+            },
+            
+            // PLAYER DAMAGED: Shocking alarm pulse + metallic crunch
+            playerHit: () => {
+                sfx.noise(0.4, 0.5, 2000);
+                sfx.playTone(150, 'sawtooth', 0.35, 0.3, 20);
+                sfx.playTone(600, 'square', 0.15, 0.2, 300);
+            },
+            
+            // POWERUP COLLECTED: Uplifting 3-note ascending sci-fi arpeggio
+            powerup: () => {
+                sfx.playTone(523.25, 'sine', 0.08, 0.12); // C5
+                setTimeout(() => sfx.playTone(659.25, 'sine', 0.08, 0.12), 70); // E5
+                setTimeout(() => sfx.playTone(783.99, 'sine', 0.08, 0.12), 140); // G5
+                setTimeout(() => sfx.playTone(1046.50, 'sine', 0.2, 0.15), 210); // C6
+            },
+            
+            // ENGINE RUMBLE LOOP
+            initEngine: () => {
+                if(engineOsc) return;
+                engineOsc = audioCtx.createOscillator();
+                engineGain = audioCtx.createGain();
+                engineOsc.type = 'triangle';
+                engineOsc.frequency.value = 50; 
+                engineGain.gain.value = 0;
+                engineOsc.connect(engineGain); engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+            },
+            updateEngine: (isThrusting) => {
+                if(!engineGain) return;
+                const targetVol = isThrusting ? 0.12 : 0;
+                const targetFreq = isThrusting ? 85 : 50;
+                engineGain.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.1);
+                engineOsc.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
+            }
+        };
+
+        // --- 2. FULLSCREEN API ---
+        function requestFullScreen() {
+            let doc = document.documentElement;
+            if (doc.requestFullscreen) doc.requestFullscreen().catch(()=>{});
+            else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen().catch(()=>{});
+            else if (doc.msRequestFullscreen) doc.msRequestFullscreen().catch(()=>{});
+        }
+
+        // --- 3. GAME ENGINE SETUP ---
         const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
               Bodies = Matter.Bodies, Composite = Matter.Composite, Events = Matter.Events, Body = Matter.Body;
 
@@ -154,36 +265,33 @@
         engine.gravity.y = 0; engine.gravity.x = 0;
 
         let gameState = 'START'; 
-        let currentLevel = 1;
-        let playerScore = 0;
-        
+        let currentLevel = 1, playerScore = 0;
         let rocket, ground, ceiling;
         let activeAsteroids = [], activeLasers = [], activePowerups = [], stars = [], nebulae = []; 
-        let activeEnemies = [], activeEnemyLasers = [];
-        let engineParticles = [];
+        let activeEnemies = [], activeEnemyLasers = [], engineParticles = [];
         
         let isThrusting = false;
-        let timeRemaining = 60;
-        let timerInterval, frameCounter = 0;
+        let timeRemaining = 60, timerInterval, frameCounter = 0;
         let weaponLevel = 1, invulnTimer = 0; 
+        let shipAnchorX = w * 0.15; 
 
-        for(let i=0; i<180; i++) stars.push({ x: Math.random() * w, y: Math.random() * h, speed: Math.random() * 1.5 + 0.1, size: Math.random() * 2 });
-        for(let i=0; i<5; i++) nebulae.push({ x: Math.random() * w, y: Math.random() * h, size: Math.random() * 300 + 200, r: Math.random()*40, g: Math.random()*40, b: Math.random()*120+40 });
+        for(let i=0; i<100; i++) stars.push({ x: Math.random() * w, y: Math.random() * h, speed: Math.random() * 1.5 + 0.1, size: Math.random() * 2 });
+        for(let i=0; i<3; i++) nebulae.push({ x: Math.random() * w, y: Math.random() * h, size: Math.random() * 200 + 150, r: Math.random()*40, g: Math.random()*40, b: Math.random()*120+40 });
 
         const canvas = document.getElementById('game-canvas');
         const render = Render.create({
             canvas: canvas, engine: engine,
-            options: { width: w, height: h, wireframes: false, background: '#010205', pixelRatio: window.devicePixelRatio }
+            options: { width: w, height: h, wireframes: false, background: '#010205' }
         });
 
+        let lastWidth = window.innerWidth;
         window.addEventListener('resize', () => {
+            if (Math.abs(window.innerWidth - lastWidth) > 150) { location.reload(); }
             w = window.innerWidth; h = window.innerHeight;
             render.canvas.width = w; render.canvas.height = h;
-            if(gameState === 'START') initWorld();
+            shipAnchorX = w * 0.15;
         });
 
-        // --- HELPER: NATIVE RENDER HIDING ---
-        // Setting { render: { visible: false } } ensures Matter's default canvas drawing NEVER interferes with our custom 3D drawing.
         const invisibleObj = { visible: false };
 
         function initWorld() {
@@ -196,9 +304,7 @@
 
         function spawnRocket() {
             if(rocket) Composite.remove(world, rocket);
-            rocket = Bodies.rectangle(120, h / 2, 45, 20, { 
-                restitution: 0, frictionAir: 0.05, label: 'rocket', isSensor: true, render: invisibleObj 
-            });
+            rocket = Bodies.rectangle(shipAnchorX, h / 2, 45, 20, { restitution: 0, frictionAir: 0.05, label: 'rocket', isSensor: true, render: invisibleObj });
             Composite.add(world, rocket);
             weaponLevel = 1; invulnTimer = 0; updateWeaponHUD();
         }
@@ -207,23 +313,22 @@
         function updateScore(points) { playerScore += points; document.getElementById('hud-score').innerText = playerScore; }
 
         function startLevel(levelNum, keepScore = false) {
-            currentLevel = levelNum;
-            document.getElementById('hud-level').innerText = levelNum;
-            timeRemaining = 60;
-            document.getElementById('hud-timer').innerText = timeRemaining;
-            
+            currentLevel = levelNum; document.getElementById('hud-level').innerText = levelNum;
+            timeRemaining = 60; document.getElementById('hud-timer').innerText = timeRemaining;
             if(!keepScore) { playerScore = 0; updateScore(0); }
             
             activeAsteroids.forEach(a => Composite.remove(world, a)); activeLasers.forEach(l => Composite.remove(world, l)); 
             activePowerups.forEach(p => Composite.remove(world, p)); activeEnemies.forEach(e => Composite.remove(world, e));
             activeEnemyLasers.forEach(el => Composite.remove(world, el));
-            
             activeAsteroids = []; activeLasers = []; activePowerups = []; activeEnemies = []; activeEnemyLasers = [];
             
             spawnRocket();
             document.getElementById('weapon-status').classList.remove('hidden');
             document.getElementById('score-status').classList.remove('hidden');
             gameState = 'PLAYING';
+            
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            sfx.initEngine();
 
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -239,12 +344,13 @@
             const laser = Bodies.rectangle(rocket.position.x + 35, rocket.position.y + yOffset, 30, thickness, {
                 isSensor: true, label: 'laser', damage: dmg, frictionAir: 0, render: invisibleObj
             });
-            Body.setVelocity(laser, { x: 25, y: 0 }); 
+            Body.setVelocity(laser, { x: 20, y: 0 }); 
             activeLasers.push(laser); Composite.add(world, laser);
         }
 
         function shootLaser() {
             if (gameState !== 'PLAYING' || !rocket) return;
+            sfx.shoot(); 
             if (weaponLevel === 1) { spawnLaserLine(0, 4, 1); } 
             else if (weaponLevel === 2) { spawnLaserLine(-8, 4, 1); spawnLaserLine(8, 4, 1); } 
             else if (weaponLevel === 3) { spawnLaserLine(0, 4, 1); spawnLaserLine(-15, 4, 1); spawnLaserLine(15, 4, 1); } 
@@ -254,19 +360,19 @@
         function spawnEnemy() {
             if (gameState !== 'PLAYING') return;
             const yPos = Math.random() * (h - 100) + 50;
-            const enemy = Bodies.polygon(w + 50, yPos, 3, 22, {
+            const enemy = Bodies.polygon(w + 50, yPos, 3, 20, {
                 label: 'enemy', hp: 3, frictionAir: 0, isSensor: true, angle: -Math.PI / 2, render: invisibleObj
             });
-            Body.setVelocity(enemy, { x: -3.5 - (currentLevel * 0.2), y: 0 });
+            Body.setVelocity(enemy, { x: -3.0 - (currentLevel * 0.2), y: 0 });
             activeEnemies.push(enemy); Composite.add(world, enemy);
         }
 
         function spawnAsteroid() {
             if (gameState !== 'PLAYING') return;
             const isGoliath = Math.random() < 0.15; 
-            const size = isGoliath ? 55 : (Math.random() * 20 + 15); 
+            const size = isGoliath ? 45 : (Math.random() * 20 + 15); 
             const yPos = Math.random() * (h - 100) + 50;
-            const speed = isGoliath ? 1.5 : (Math.random() * 2 + 2) + (currentLevel * 0.3); 
+            const speed = isGoliath ? 1.5 : (Math.random() * 2 + 2) + (currentLevel * 0.2); 
 
             let hp = 1; if (size > 28) hp = 2; if (size > 38) hp = 3; if (isGoliath) hp = 5; 
 
@@ -284,7 +390,7 @@
             if (gameState !== 'PLAYING') return;
             const yPos = Math.random() * (h - 100) + 50;
             const powerup = Bodies.circle(w + 50, yPos, 20, { isSensor: true, label: 'powerup', frictionAir: 0, render: invisibleObj });
-            Body.setVelocity(powerup, { x: -2.5, y: 0 }); 
+            Body.setVelocity(powerup, { x: -2.0, y: 0 }); 
             activePowerups.push(powerup); Composite.add(world, powerup);
         }
 
@@ -294,9 +400,10 @@
             frameCounter++;
             if (invulnTimer > 0) invulnTimer--;
 
-            // Rocket Movement
+            sfx.updateEngine(isThrusting);
+
             let clampedY = Math.max(30, Math.min(rocket.position.y, h - 30));
-            Body.setPosition(rocket, { x: 120, y: clampedY });
+            Body.setPosition(rocket, { x: shipAnchorX, y: clampedY });
             Body.setVelocity(rocket, { x: 0, y: rocket.velocity.y }); 
             Body.applyForce(rocket, rocket.position, { x: 0, y: 0.0012 });
 
@@ -316,42 +423,29 @@
                 if (ep.life <= 0) engineParticles.splice(i, 1);
             }
 
-            // Behaviors
             if (frameCounter % 15 === 0) shootLaser();
-            if (frameCounter % Math.max(30, 80 - (currentLevel * 5)) === 0) spawnAsteroid();
-            if (frameCounter % Math.max(100, 200 - (currentLevel * 10)) === 0) spawnEnemy();
+            if (frameCounter % Math.max(35, 90 - (currentLevel * 5)) === 0) spawnAsteroid();
+            if (frameCounter % Math.max(120, 250 - (currentLevel * 10)) === 0) spawnEnemy();
             if (frameCounter % 400 === 0) spawnPowerUp(); 
 
-            // Enemy Bobbing & Shooting
             activeEnemies.forEach(e => {
                 Body.setVelocity(e, { x: e.velocity.x, y: Math.sin(frameCounter * 0.05 + e.id) * 3 });
-                if (Math.random() < 0.015) { // Enemy shoot chance
+                if (Math.random() < 0.015) { 
+                    sfx.enemyShoot();
                     const elaser = Bodies.rectangle(e.position.x - 25, e.position.y, 20, 6, { label: 'enemy_laser', isSensor: true, frictionAir: 0, render: invisibleObj });
-                    Body.setVelocity(elaser, { x: -14, y: 0 });
+                    Body.setVelocity(elaser, { x: -10, y: 0 });
                     activeEnemyLasers.push(elaser); Composite.add(world, elaser);
                 }
             });
 
-            // Constant Velocity Maintenance
-            activeLasers.forEach(l => { Body.setVelocity(l, { x: 25, y: 0 }); });
-            activeEnemyLasers.forEach(el => { Body.setVelocity(el, { x: -14, y: 0 }); });
+            activeLasers.forEach(l => { Body.setVelocity(l, { x: 20, y: 0 }); });
+            activeEnemyLasers.forEach(el => { Body.setVelocity(el, { x: -10, y: 0 }); });
 
-            // Garbage Collection
-            for (let i = activeLasers.length - 1; i >= 0; i--) {
-                if (activeLasers[i].position.x > w + 50) { Composite.remove(world, activeLasers[i]); activeLasers.splice(i, 1); }
-            }
-            for (let i = activeEnemyLasers.length - 1; i >= 0; i--) {
-                if (activeEnemyLasers[i].position.x < -50) { Composite.remove(world, activeEnemyLasers[i]); activeEnemyLasers.splice(i, 1); }
-            }
-            for (let i = activeAsteroids.length - 1; i >= 0; i--) {
-                if (activeAsteroids[i].position.x < -80) { Composite.remove(world, activeAsteroids[i]); activeAsteroids.splice(i, 1); }
-            }
-            for (let i = activeEnemies.length - 1; i >= 0; i--) {
-                if (activeEnemies[i].position.x < -50) { Composite.remove(world, activeEnemies[i]); activeEnemies.splice(i, 1); }
-            }
-            for (let i = activePowerups.length - 1; i >= 0; i--) {
-                if (activePowerups[i].position.x < -50) { Composite.remove(world, activePowerups[i]); activePowerups.splice(i, 1); }
-            }
+            for (let i = activeLasers.length - 1; i >= 0; i--) { if (activeLasers[i].position.x > w + 50) { Composite.remove(world, activeLasers[i]); activeLasers.splice(i, 1); } }
+            for (let i = activeEnemyLasers.length - 1; i >= 0; i--) { if (activeEnemyLasers[i].position.x < -50) { Composite.remove(world, activeEnemyLasers[i]); activeEnemyLasers.splice(i, 1); } }
+            for (let i = activeAsteroids.length - 1; i >= 0; i--) { if (activeAsteroids[i].position.x < -80) { Composite.remove(world, activeAsteroids[i]); activeAsteroids.splice(i, 1); } }
+            for (let i = activeEnemies.length - 1; i >= 0; i--) { if (activeEnemies[i].position.x < -50) { Composite.remove(world, activeEnemies[i]); activeEnemies.splice(i, 1); } }
+            for (let i = activePowerups.length - 1; i >= 0; i--) { if (activePowerups[i].position.x < -50) { Composite.remove(world, activePowerups[i]); activePowerups.splice(i, 1); } }
         });
 
         // --- CUSTOM RENDERING ---
@@ -426,8 +520,8 @@
                     ctx.moveTo(15, -15); ctx.lineTo(-20, 0); ctx.lineTo(15, 15); ctx.lineTo(5, 0); ctx.closePath();
                     ctx.fill(); ctx.strokeStyle = '#FF3300'; ctx.lineWidth = 1; ctx.stroke();
                     
-                    ctx.fillStyle = '#FF8800'; ctx.beginPath(); ctx.arc(10, 0, 4 + Math.random()*2, 0, Math.PI*2); ctx.fill(); // Engine
-                    ctx.fillStyle = '#00FFCC'; ctx.beginPath(); ctx.arc(-5, 0, 3, 0, Math.PI*2); ctx.fill(); // Cockpit
+                    ctx.fillStyle = '#FF8800'; ctx.beginPath(); ctx.arc(10, 0, 4 + Math.random()*2, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = '#00FFCC'; ctx.beginPath(); ctx.arc(-5, 0, 3, 0, Math.PI*2); ctx.fill(); 
                     ctx.restore();
                 }
                 else if (b.label === 'laser') {
@@ -495,6 +589,7 @@
         // --- COLLISION & COMBAT HANDLING ---
         function triggerGameOver() {
             gameState = 'GAMEOVER'; clearInterval(timerInterval);
+            sfx.playerHit(); sfx.updateEngine(false);
             document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 400);
             document.getElementById('hud').classList.add('hidden'); document.getElementById('weapon-status').classList.add('hidden'); document.getElementById('score-status').classList.add('hidden');
             document.getElementById('final-score').innerText = playerScore; document.getElementById('final-level').innerText = currentLevel;
@@ -503,6 +598,7 @@
 
         function triggerVictory() {
             gameState = 'VICTORY'; clearInterval(timerInterval);
+            sfx.updateEngine(false);
             Composite.remove(world, rocket); activeAsteroids.forEach(a => Composite.remove(world, a)); activeEnemies.forEach(e => Composite.remove(world, e));
             document.getElementById('hud').classList.add('hidden'); document.getElementById('weapon-status').classList.add('hidden'); document.getElementById('score-status').classList.add('hidden');
             document.getElementById('victory-screen').classList.remove('hidden');
@@ -517,6 +613,7 @@
                     createParticles(rocket.position.x, rocket.position.y, '#FF3300', 60, 0.15); 
                     Composite.remove(world, rocket); rocket = null; triggerGameOver(); return true; 
                 } else {
+                    sfx.playerHit();
                     createParticles(rocket.position.x, rocket.position.y, '#00FFCC', 15, 0.08); invulnTimer = 60; return false;
                 }
             }
@@ -534,6 +631,7 @@
                 // POWERUP HIT
                 if ((labelA === 'rocket' && labelB === 'powerup') || (labelB === 'rocket' && labelA === 'powerup')) {
                     const pup = labelA === 'powerup' ? bodyA : bodyB;
+                    sfx.powerup();
                     weaponLevel = Math.min(weaponLevel + 1, 4); updateWeaponHUD(); updateScore(250); 
                     createParticles(pup.position.x, pup.position.y, '#00bfff', 20, 0.06); 
                     Composite.remove(world, pup); activePowerups = activePowerups.filter(p => p.id !== pup.id);
@@ -549,10 +647,12 @@
 
                         if (target.hp <= 0) {
                             if (target.label === 'enemy') {
+                                sfx.enemyExplode();
                                 updateScore(300); createParticles(target.position.x, target.position.y, '#FF3300', 30, 0.1); 
                                 Composite.remove(world, target); activeEnemies = activeEnemies.filter(e => e.id !== target.id);
                             } 
                             else if (target.isFlaming) {
+                                sfx.goliathSplit();
                                 updateScore(500); 
                                 const offsets = [ {x: 0, y: -20}, {x: -20, y: 0}, {x: 0, y: 20} ];
                                 for(let k=0; k<3; k++) {
@@ -567,10 +667,12 @@
                                 createParticles(target.position.x, target.position.y, '#FF3300', 40, 0.15); 
                                 Composite.remove(world, target); activeAsteroids = activeAsteroids.filter(a => a.id !== target.id);
                             } else {
+                                sfx.rockExplode();
                                 updateScore(100); createParticles(target.position.x, target.position.y, '#888', 25, 0.08); 
                                 Composite.remove(world, target); activeAsteroids = activeAsteroids.filter(a => a.id !== target.id);
                             }
                         } else {
+                            sfx.hit(); // Laser chip hit sound
                             createParticles(las.position.x, las.position.y, '#FF3300', 8, 0.04); 
                         }
                         Composite.remove(world, las); activeLasers = activeLasers.filter(l => l.id !== las.id);
@@ -585,7 +687,7 @@
                         if (hazard.label === 'enemy_laser') {
                             Composite.remove(world, hazard); activeEnemyLasers = activeEnemyLasers.filter(l => l.id !== hazard.id);
                         }
-                        if (died) return; // Stop checking collisions if dead
+                        if (died) return; 
                     }
                 }
             }
@@ -593,18 +695,22 @@
 
         // 6. CONTROLS
         document.getElementById('start-btn').addEventListener('click', () => {
+            requestFullScreen();
             document.getElementById('start-screen').classList.add('hidden'); 
             startLevel(1, false);
         });
         document.getElementById('retry-btn').addEventListener('click', () => {
+            requestFullScreen();
             document.getElementById('game-over-screen').classList.add('hidden'); 
             startLevel(currentLevel, false); 
         });
         document.getElementById('restart-btn').addEventListener('click', () => {
+            requestFullScreen();
             document.getElementById('game-over-screen').classList.add('hidden'); 
             startLevel(1, false); 
         });
         document.getElementById('next-level-btn').addEventListener('click', () => {
+            requestFullScreen();
             document.getElementById('victory-screen').classList.add('hidden'); 
             startLevel(currentLevel + 1, true); 
         });
