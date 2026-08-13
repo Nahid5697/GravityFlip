@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Deep Space Survivor - The Ultimate Sound Update</title>
+    <title>Deep Space Survivor - The Anti-Camping Update</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%; 
@@ -117,7 +117,7 @@
 
     <div id="start-screen" class="ui-screen">
         <h1>Deep Space</h1>
-        <p>Hold screen to thrust. Auto-fire engaged.<br>Dodge Asteroids and Enemy Fighters!<br>Survive for 60 seconds.</p>
+        <p>Hold screen to thrust. Auto-fire engaged.<br>Dodge Asteroids, Enemies, and Ceiling Mines!<br>Survive for 60 seconds.</p>
         <button class="btn btn-play" id="start-btn">Initiate Launch</button>
         <div class="credit-text">Developed by Tauhidul Islam Nahid</div>
     </div>
@@ -142,7 +142,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     
     <script>
-        // --- 1. ENHANCED WEB AUDIO API SYNTH ENGINE ---
+        // --- 1. WEB AUDIO API SYNTH ENGINE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
         let engineOsc = null, engineGain = null;
@@ -183,56 +183,29 @@
                 noiseSource.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
                 noiseSource.start();
             },
-            // PLAYER LASER: Crisp high-tech sweep
             shoot: () => sfx.playTone(800, 'square', 0.12, 0.06, 200),
-            
-            // ENEMY LASER: Dark alien pitch-drop
             enemyShoot: () => sfx.playTone(900, 'sawtooth', 0.25, 0.07, 120),
-            
-            // IMPACT CHIP: Short metallic hit click when hitting tough targets
             hit: () => { sfx.playTone(400, 'triangle', 0.05, 0.08, 100); sfx.noise(0.04, 0.1, 3000); },
-            
-            // NORMAL ASTEROID DESTROYED: Crunchy rock burst
             rockExplode: () => { sfx.noise(0.3, 0.35, 800); sfx.playTone(180, 'sawtooth', 0.25, 0.15, 30); },
-            
-            // ENEMY SHIP DESTROYED: Electric synth pop explosion
-            enemyExplode: () => { 
-                sfx.noise(0.4, 0.4, 1500); 
-                sfx.playTone(350, 'sawtooth', 0.35, 0.2, 40); 
-                sfx.playTone(700, 'square', 0.15, 0.1, 100);
-            },
-            
-            // GOLIATH SPLIT: Deep rumbling lava explosion + multi-tone crackle
+            enemyExplode: () => { sfx.noise(0.4, 0.4, 1500); sfx.playTone(350, 'sawtooth', 0.35, 0.2, 40); sfx.playTone(700, 'square', 0.15, 0.1, 100); },
             goliathSplit: () => {
-                sfx.noise(0.8, 0.6, 500); // Deep heavy rumble
-                sfx.playTone(120, 'sawtooth', 0.7, 0.4, 15); // Sub bass drop
-                setTimeout(() => sfx.playTone(500, 'square', 0.1, 0.15, 100), 50); // Crackle 1
-                setTimeout(() => sfx.playTone(400, 'square', 0.12, 0.15, 80), 120); // Crackle 2
-                setTimeout(() => sfx.playTone(600, 'sawtooth', 0.15, 0.15, 150), 200); // Crackle 3
+                sfx.noise(0.8, 0.6, 500); 
+                sfx.playTone(120, 'sawtooth', 0.7, 0.4, 15); 
+                setTimeout(() => sfx.playTone(500, 'square', 0.1, 0.15, 100), 50); 
+                setTimeout(() => sfx.playTone(400, 'square', 0.12, 0.15, 80), 120); 
+                setTimeout(() => sfx.playTone(600, 'sawtooth', 0.15, 0.15, 150), 200); 
             },
-            
-            // PLAYER DAMAGED: Shocking alarm pulse + metallic crunch
-            playerHit: () => {
-                sfx.noise(0.4, 0.5, 2000);
-                sfx.playTone(150, 'sawtooth', 0.35, 0.3, 20);
-                sfx.playTone(600, 'square', 0.15, 0.2, 300);
-            },
-            
-            // POWERUP COLLECTED: Uplifting 3-note ascending sci-fi arpeggio
+            playerHit: () => { sfx.noise(0.4, 0.5, 2000); sfx.playTone(150, 'sawtooth', 0.35, 0.3, 20); sfx.playTone(600, 'square', 0.15, 0.2, 300); },
             powerup: () => {
-                sfx.playTone(523.25, 'sine', 0.08, 0.12); // C5
-                setTimeout(() => sfx.playTone(659.25, 'sine', 0.08, 0.12), 70); // E5
-                setTimeout(() => sfx.playTone(783.99, 'sine', 0.08, 0.12), 140); // G5
-                setTimeout(() => sfx.playTone(1046.50, 'sine', 0.2, 0.15), 210); // C6
+                sfx.playTone(523.25, 'sine', 0.08, 0.12); 
+                setTimeout(() => sfx.playTone(659.25, 'sine', 0.08, 0.12), 70); 
+                setTimeout(() => sfx.playTone(783.99, 'sine', 0.08, 0.12), 140); 
+                setTimeout(() => sfx.playTone(1046.50, 'sine', 0.2, 0.15), 210); 
             },
-            
-            // ENGINE RUMBLE LOOP
             initEngine: () => {
                 if(engineOsc) return;
-                engineOsc = audioCtx.createOscillator();
-                engineGain = audioCtx.createGain();
-                engineOsc.type = 'triangle';
-                engineOsc.frequency.value = 50; 
+                engineOsc = audioCtx.createOscillator(); engineGain = audioCtx.createGain();
+                engineOsc.type = 'triangle'; engineOsc.frequency.value = 50; 
                 engineGain.gain.value = 0;
                 engineOsc.connect(engineGain); engineGain.connect(audioCtx.destination);
                 engineOsc.start();
@@ -269,6 +242,7 @@
         let rocket, ground, ceiling;
         let activeAsteroids = [], activeLasers = [], activePowerups = [], stars = [], nebulae = []; 
         let activeEnemies = [], activeEnemyLasers = [], engineParticles = [];
+        let activeMines = []; // NEW: Array for Anti-Camping Mines
         
         let isThrusting = false;
         let timeRemaining = 60, timerInterval, frameCounter = 0;
@@ -319,8 +293,8 @@
             
             activeAsteroids.forEach(a => Composite.remove(world, a)); activeLasers.forEach(l => Composite.remove(world, l)); 
             activePowerups.forEach(p => Composite.remove(world, p)); activeEnemies.forEach(e => Composite.remove(world, e));
-            activeEnemyLasers.forEach(el => Composite.remove(world, el));
-            activeAsteroids = []; activeLasers = []; activePowerups = []; activeEnemies = []; activeEnemyLasers = [];
+            activeEnemyLasers.forEach(el => Composite.remove(world, el)); activeMines.forEach(m => Composite.remove(world, m));
+            activeAsteroids = []; activeLasers = []; activePowerups = []; activeEnemies = []; activeEnemyLasers = []; activeMines = [];
             
             spawnRocket();
             document.getElementById('weapon-status').classList.remove('hidden');
@@ -359,20 +333,20 @@
 
         function spawnEnemy() {
             if (gameState !== 'PLAYING') return;
-            const yPos = Math.random() * (h - 100) + 50;
+            const yPos = Math.random() * (h - 140) + 70; // Keep off extreme edges
             const enemy = Bodies.polygon(w + 50, yPos, 3, 20, {
                 label: 'enemy', hp: 3, frictionAir: 0, isSensor: true, angle: -Math.PI / 2, render: invisibleObj
             });
-            Body.setVelocity(enemy, { x: -3.0 - (currentLevel * 0.2), y: 0 });
+            Body.setVelocity(enemy, { x: -3.0 - (currentLevel * 0.25), y: 0 }); // Scales with level
             activeEnemies.push(enemy); Composite.add(world, enemy);
         }
 
         function spawnAsteroid() {
             if (gameState !== 'PLAYING') return;
-            const isGoliath = Math.random() < 0.15; 
+            const isGoliath = Math.random() < (0.10 + (currentLevel * 0.02)); // Goliaths more common later
             const size = isGoliath ? 45 : (Math.random() * 20 + 15); 
-            const yPos = Math.random() * (h - 100) + 50;
-            const speed = isGoliath ? 1.5 : (Math.random() * 2 + 2) + (currentLevel * 0.2); 
+            const yPos = Math.random() * (h - 140) + 70; 
+            const speed = isGoliath ? (1.5 + currentLevel * 0.1) : (Math.random() * 2 + 2) + (currentLevel * 0.25); 
 
             let hp = 1; if (size > 28) hp = 2; if (size > 38) hp = 3; if (isGoliath) hp = 5; 
 
@@ -386,9 +360,23 @@
             activeAsteroids.push(asteroid); Composite.add(world, asteroid);
         }
 
+        // NEW: Anti-Camping Wall Mines
+        function spawnMine() {
+            if (gameState !== 'PLAYING') return;
+            const isTop = Math.random() > 0.5;
+            const yPos = isTop ? 15 : h - 15; // Directly on the edges
+            
+            const mine = Bodies.polygon(w + 50, yPos, 3, 25, {
+                label: 'mine', isSensor: true, frictionAir: 0, angle: isTop ? Math.PI : 0, render: invisibleObj
+            });
+            const speed = (Math.random() * 2 + 2) + (currentLevel * 0.25); 
+            Body.setVelocity(mine, { x: -speed, y: 0 }); 
+            activeMines.push(mine); Composite.add(world, mine);
+        }
+
         function spawnPowerUp() {
             if (gameState !== 'PLAYING') return;
-            const yPos = Math.random() * (h - 100) + 50;
+            const yPos = Math.random() * (h - 140) + 70;
             const powerup = Bodies.circle(w + 50, yPos, 20, { isSensor: true, label: 'powerup', frictionAir: 0, render: invisibleObj });
             Body.setVelocity(powerup, { x: -2.0, y: 0 }); 
             activePowerups.push(powerup); Composite.add(world, powerup);
@@ -402,7 +390,7 @@
 
             sfx.updateEngine(isThrusting);
 
-            let clampedY = Math.max(30, Math.min(rocket.position.y, h - 30));
+            let clampedY = Math.max(20, Math.min(rocket.position.y, h - 20)); // Allow reaching edges to get hit by mines
             Body.setPosition(rocket, { x: shipAnchorX, y: clampedY });
             Body.setVelocity(rocket, { x: 0, y: rocket.velocity.y }); 
             Body.applyForce(rocket, rocket.position, { x: 0, y: 0.0012 });
@@ -423,28 +411,31 @@
                 if (ep.life <= 0) engineParticles.splice(i, 1);
             }
 
+            // DYNAMIC DIFFICULTY TIMERS (Scales aggressively with currentLevel)
             if (frameCounter % 15 === 0) shootLaser();
-            if (frameCounter % Math.max(35, 90 - (currentLevel * 5)) === 0) spawnAsteroid();
-            if (frameCounter % Math.max(120, 250 - (currentLevel * 10)) === 0) spawnEnemy();
+            if (frameCounter % Math.max(25, 90 - (currentLevel * 8)) === 0) spawnAsteroid();
+            if (frameCounter % Math.max(80, 250 - (currentLevel * 15)) === 0) spawnEnemy();
+            if (frameCounter % Math.max(50, 180 - (currentLevel * 10)) === 0) spawnMine(); // Spawns faster over time
             if (frameCounter % 400 === 0) spawnPowerUp(); 
 
             activeEnemies.forEach(e => {
                 Body.setVelocity(e, { x: e.velocity.x, y: Math.sin(frameCounter * 0.05 + e.id) * 3 });
-                if (Math.random() < 0.015) { 
+                // Enemy fire rate increases with level
+                if (Math.random() < (0.015 + (currentLevel * 0.003))) { 
                     sfx.enemyShoot();
                     const elaser = Bodies.rectangle(e.position.x - 25, e.position.y, 20, 6, { label: 'enemy_laser', isSensor: true, frictionAir: 0, render: invisibleObj });
-                    Body.setVelocity(elaser, { x: -10, y: 0 });
+                    Body.setVelocity(elaser, { x: -12 - (currentLevel * 0.5), y: 0 });
                     activeEnemyLasers.push(elaser); Composite.add(world, elaser);
                 }
             });
 
             activeLasers.forEach(l => { Body.setVelocity(l, { x: 20, y: 0 }); });
-            activeEnemyLasers.forEach(el => { Body.setVelocity(el, { x: -10, y: 0 }); });
 
             for (let i = activeLasers.length - 1; i >= 0; i--) { if (activeLasers[i].position.x > w + 50) { Composite.remove(world, activeLasers[i]); activeLasers.splice(i, 1); } }
             for (let i = activeEnemyLasers.length - 1; i >= 0; i--) { if (activeEnemyLasers[i].position.x < -50) { Composite.remove(world, activeEnemyLasers[i]); activeEnemyLasers.splice(i, 1); } }
             for (let i = activeAsteroids.length - 1; i >= 0; i--) { if (activeAsteroids[i].position.x < -80) { Composite.remove(world, activeAsteroids[i]); activeAsteroids.splice(i, 1); } }
             for (let i = activeEnemies.length - 1; i >= 0; i--) { if (activeEnemies[i].position.x < -50) { Composite.remove(world, activeEnemies[i]); activeEnemies.splice(i, 1); } }
+            for (let i = activeMines.length - 1; i >= 0; i--) { if (activeMines[i].position.x < -50) { Composite.remove(world, activeMines[i]); activeMines.splice(i, 1); } }
             for (let i = activePowerups.length - 1; i >= 0; i--) { if (activePowerups[i].position.x < -50) { Composite.remove(world, activePowerups[i]); activePowerups.splice(i, 1); } }
         });
 
@@ -512,6 +503,16 @@
                     }
                     ctx.restore();
                 } 
+                else if (b.label === 'mine') {
+                    // Render Anti-Camping Mines
+                    ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+                    ctx.shadowBlur = 15; ctx.shadowColor = '#FF0000';
+                    ctx.fillStyle = '#aa0000'; ctx.strokeStyle = '#FF3300'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(0, 25); ctx.lineTo(-15, -15); ctx.lineTo(15, -15); ctx.closePath();
+                    ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#FFDD00'; ctx.beginPath(); ctx.arc(0, 0, 4 + Math.sin(time*10)*2, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                }
                 else if (b.label === 'enemy') {
                     ctx.save(); ctx.translate(b.position.x, b.position.y);
                     let eGrad = ctx.createLinearGradient(-15, -10, 15, 10);
@@ -600,6 +601,7 @@
             gameState = 'VICTORY'; clearInterval(timerInterval);
             sfx.updateEngine(false);
             Composite.remove(world, rocket); activeAsteroids.forEach(a => Composite.remove(world, a)); activeEnemies.forEach(e => Composite.remove(world, e));
+            activeMines.forEach(m => Composite.remove(world, m));
             document.getElementById('hud').classList.add('hidden'); document.getElementById('weapon-status').classList.add('hidden'); document.getElementById('score-status').classList.add('hidden');
             document.getElementById('victory-screen').classList.remove('hidden');
         }
@@ -637,7 +639,7 @@
                     Composite.remove(world, pup); activePowerups = activePowerups.filter(p => p.id !== pup.id);
                 }
 
-                // LASER HITS ASTEROID OR ENEMY
+                // LASER HITS TARGET (Asteroid, Enemy, or Mine)
                 if (labelA === 'laser' || labelB === 'laser') {
                     const las = labelA === 'laser' ? bodyA : bodyB;
                     const target = labelA === 'laser' ? bodyB : bodyA;
@@ -672,9 +674,14 @@
                                 Composite.remove(world, target); activeAsteroids = activeAsteroids.filter(a => a.id !== target.id);
                             }
                         } else {
-                            sfx.hit(); // Laser chip hit sound
+                            sfx.hit(); 
                             createParticles(las.position.x, las.position.y, '#FF3300', 8, 0.04); 
                         }
+                        Composite.remove(world, las); activeLasers = activeLasers.filter(l => l.id !== las.id);
+                    } else if (target.label === 'mine') {
+                        // Mines are indestructible. Hitting them just absorbs the laser.
+                        sfx.hit();
+                        createParticles(las.position.x, las.position.y, '#FF3300', 8, 0.04); 
                         Composite.remove(world, las); activeLasers = activeLasers.filter(l => l.id !== las.id);
                     }
                 }
@@ -682,7 +689,7 @@
                 // ROCKET TAKES DAMAGE
                 if (labelA === 'rocket' || labelB === 'rocket') {
                     const hazard = labelA === 'rocket' ? bodyB : bodyA;
-                    if (hazard.label === 'asteroid' || hazard.label === 'enemy' || hazard.label === 'enemy_laser') {
+                    if (hazard.label === 'asteroid' || hazard.label === 'enemy' || hazard.label === 'enemy_laser' || hazard.label === 'mine') {
                         let died = playerTakeDamage();
                         if (hazard.label === 'enemy_laser') {
                             Composite.remove(world, hazard); activeEnemyLasers = activeEnemyLasers.filter(l => l.id !== hazard.id);
